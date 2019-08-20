@@ -112,11 +112,12 @@ public struct BackgrounderCommand: Command, ServiceType {
                     let elapsedTime = endTime.toEpoch-startTime.toEpoch
                     let jobsPerSecond = Int(round(TimeInterval(times)/elapsedTime))
                     context.console.print("\(times) jobs processed in \(String(format: "%0.2f", elapsedTime)) s.  Average of \(jobsPerSecond) jobs/s")
+                    
+                    promise.succeed()
                 } catch {
                     context.console.print("error: \(error)")
+                    promise.fail(error: error)
                 }
-                
-                promise.succeed()
             }
             
             return promise.futureResult

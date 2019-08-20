@@ -65,6 +65,8 @@ extension RedisWrapper: RedisApi {
         // Flatten them and return the array of responses
         _ = futures.flatten(on: self.worker).do { (response: [RedisData]) in
             promise.succeed(result: response)
+            }.catch { error in
+                promise.fail(error: error)
         }
         
         return promise.futureResult

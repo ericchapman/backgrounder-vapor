@@ -26,13 +26,7 @@ class BackgrounderEnqueuer: BackgrounderHelper {
     ///         job being lost do to a worker being unexpectably shut down
     ///
     func enqueue(queue: String) -> Future<Int> {
-        let promise = self.worker.eventLoop.newPromise(Int.self)
-        
-        self.enqueueItems(queue: queue) { count in
-            promise.succeed(result: count)
-        }
-        
-        return promise.futureResult
+        return self.enqueueItems(queue: queue)
     }
     
     /// Function to handle the nesting of a single pop/push operation from
@@ -84,7 +78,7 @@ class BackgrounderEnqueuer: BackgrounderHelper {
         }
     }
     
-    /// Function to handle continuously calling enqueu if more items are
+    /// Function to handle continuously calling enqueue if more items are
     /// available
     ///
     /// - parameters:
@@ -92,19 +86,17 @@ class BackgrounderEnqueuer: BackgrounderHelper {
     ///   - count: The current count when entering this method
     ///   - closure: callback with final value when finished
     ///
-    private func enqueueItems(queue: String, count: Int=0, closure: @escaping (Int)->()) {
+    private func enqueueItems(queue: String, count: Int=0) -> Future<Int> {
         
         // Iterate until there are no more entries left in the queue
-        _ = self.enqueueItem(queue: queue).map(to: Int.self) { enqueued in
+        return self.enqueueItem(queue: queue).flatMap(to: Int.self) { enqueued in
             // If a value was enqueued last time, try again
             if enqueued > 0 {
-                self.enqueueItems(queue: queue, count: count+1, closure: closure)
+                return self.enqueueItems(queue: queue, count: count+1)
             }
             else {
-                closure(count)
+                return self.eventLoop.newSucceededFuture(result: count)
             }
-            
-            return enqueued
         }
     }
 }
