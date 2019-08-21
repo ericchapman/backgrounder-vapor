@@ -53,7 +53,7 @@ class BackgrounderWorker {
         } }
     
     /// The jobs that are currently running (ID -> JOB) pair
-    var runningJobs = [String:[String:Any]]()
+    var runningJobs: [String:(BackgrounderJob, Date)] = [:]
     
     /// Jobs Count
     var runningJobsCount: Int { return self.runningJobs.count }
@@ -79,6 +79,12 @@ class BackgrounderWorker {
     /// The maximum number of jobs to execute in parallel
     var maxJobs: Int {
         return self.config.maxJobsPerWorker
+    }
+    
+    /// Errors
+    enum WorkerError: Error {
+        case couldNotInstantiateHandler(className: String)
+        case jobTimeoutReached(seconds: Int)
     }
     
     /// Constructor
@@ -199,15 +205,9 @@ class BackgrounderWorker {
         // Log the job start
         logger.info("start")
         
-        // Create helper for logging the error
-        func reportError(_ error: String) {
-            logger.error(error)
-            self.jobError(job)
-        }
-
         // Make sure the job implements the "BackgroundHandler" class
         guard let handler = job.handlerClass.self as? BackgrounderHandler.Type else {
-            reportError("could not instantiate \(job.id) with handler \(job.className)")
+            self.jobError(job, WorkerError.couldNotInstantiateHandler(className: job.className))
             return
         }
 
@@ -223,8 +223,8 @@ class BackgrounderWorker {
                 // Log the job completion
                 logger.info("done: \(Int(round(1000*elapsedTime))) ms")
                 
-                }.catch { error in reportError("\(error)") }
-        } catch { reportError("\(error)") }
+                }.catch { error in self.jobError(job, error) }
+        } catch { self.jobError(job, error) }
     }
     
     /// Reports a job start
@@ -238,11 +238,7 @@ class BackgrounderWorker {
     private func jobStarted(_ job: BackgrounderJob, startTime: Date) {
 
         // Add the job to the running jobs variable
-        self.runningJobs[job.id] = [
-            "queue": job.queue,
-            "payload": job.toHash(),
-            "run_at": startTime.toEpoch
-        ]
+        self.runningJobs[job.id] = (job, startTime)
         
         // We moved this to happen first so we can immdiately start getting
         // the next job before this one executes
@@ -259,6 +255,20 @@ class BackgrounderWorker {
     ///   - job: The job that stopped running
     ///
     private func jobEnded(_ job: BackgrounderJob) {
+        
+        // If the job is not in the running jobs, it has already ended
+        // and so we should try to delete it from the retry queue (local
+        // and in Redis) and exit
+        //
+        // Note that this situation can occur if the job timed out and
+        // then eventually finished
+        if self.runningJobs[job.id] == nil {
+            self.retries.remove(job: job)
+            if let connection = self.connection {
+                BackgrounderRetryQueue(redis: connection).delete(job: job)
+            }
+            return
+        }
 
         // Increment the number of processed jobs
         self.processedCount.increment()
@@ -284,17 +294,20 @@ class BackgrounderWorker {
     ///   - job: The job that received the error
     ///   - error: The error that was received
     ///
-    private func jobError(_ job: BackgrounderJob) {
+    private func jobError(_ job: BackgrounderJob, _ error: Error) {
+        
+        // Log the error
+        self.logger.error("job '\(job.toRedis)' ended with error '\(error)'")
         
         // Increment the number of failed jobs
         self.failedCount.increment()
         
         // Check to see if it should be added as a retry or error
         if job.shouldRetry(max: self.config.maxRetries) {
-            retries.append(job)
+            self.retries.append(job)
         }
         else {
-            errors.append(job)
+            self.errors.append(job)
         }
         
         // Call job ended to start another one
@@ -406,9 +419,21 @@ class BackgrounderWorker {
     /// Function that is called to force a healthcheck
     ///
     func runHealthCheck(closure: @escaping (BackgrounderWorker, Int, Int, [String:[String:Any]])->()) {
+        
+        // Check for jobs that have reached the job timeout
+        let expireStartTime = self.config.jobTimeout.seconds.ago
+        for (_, value) in self.runningJobs {
+            if value.1 < expireStartTime {
+                self.jobError(value.0, WorkerError.jobTimeoutReached(seconds: self.config.jobTimeout))
+            }
+        }
+        
+        // Get the information to pass to the main thread
         let processed = self.processedCount.reset()
         let failed = self.failedCount.reset()
-        let jobs = self.runningJobs
+        let jobs: [String:[String:Any]] = self.runningJobs.mapValues { job, startTime in
+            ["queue": job.queue, "payload": job.toHash(), "run_at": startTime.toEpoch]
+        }
         
         self.logger.verbose("health check PROCESSED(\(processed)) FAILED(\(failed)) JOBS(\(jobs.count))")
         

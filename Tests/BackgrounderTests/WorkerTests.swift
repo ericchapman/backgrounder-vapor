@@ -19,6 +19,10 @@ final class WorkerTests: RedisTestCase {
         config.killTimeout = 2
         config.logLevel = .info
         
+        if self.name.contains("testJobTimeout") {
+            config.jobTimeout = 2
+        }
+        
         // Create the worker
         self.process = BackgrounderLauncher(config: config, on: self.app)
         
@@ -237,6 +241,37 @@ final class WorkerTests: RedisTestCase {
         
         // Nil out the proces sto make sure stop isn't called twice
         self.process = nil
+    }
+    
+    func testJobTimeout() throws {
+        let defaultJobTimeout = self.config.jobTimeout
+        self.config.jobTimeout = Int(self.interval)
+        
+        let queue = BackgrounderQueue(name: "default", redis: self.connection)
+        let retryQueue = BackgrounderRetryQueue(redis: self.connection)
+        
+        // Ensure the job queue is empty
+        XCTAssertEqual(try queue.size.wait(), 0)
+        XCTAssertEqual(try retryQueue.size.wait(), 0)
+        
+        // Create long running job
+        let job = BackgrounderJob(className: TestBusyHandler.handlerClassName, args: [10], retry: true)
+        
+        // Submit the job
+        XCTAssertEqual(try job.submit(on: self.app).wait(), true)
+        
+        // Sleep 2 seconds and ensure the job is no longer in the queue (it is running
+        sleep(1)
+        XCTAssertEqual(try queue.size.wait(), 0)
+        
+        // Sleep "interval" time.  Waiting for job to timeout and health check needs to run
+        sleep(2*self.interval)
+        
+        // Ensure that the job is now in the retry queue
+        XCTAssertEqual(try retryQueue.size.wait(), 1)
+        
+        // Restore the default
+        self.config.jobTimeout = defaultJobTimeout
     }
     
     func testStopCommands() throws {

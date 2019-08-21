@@ -150,6 +150,7 @@ public final class BackgrounderLauncher: Backgrounder, ServiceType {
         console.print("   - queues: \(self.config.queues)")
         console.print("   - labels: \(self.config.labels)")
         console.print("   - blocking timeout: \(self.config.blockingTimeout) s")
+        console.print("   - job timeout: \(self.config.jobTimeout) s")
         console.print("   - health check interval: \(self.config.healthCheckInterval) s")
         console.print("   - maintenance interval: \(self.config.maintenanceInterval) s")
         console.print("   - should perform maintenance: \(self.config.shouldPerformMaintenance)")

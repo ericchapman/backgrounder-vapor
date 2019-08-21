@@ -166,6 +166,23 @@ extension Array where Element: BackgrounderJob {
             }
         })
     }
+    
+    /// Removes a job from the array
+    ///
+    /// - parameters:
+    ///   - job: The job to remove from the array
+    ///
+    mutating func remove(job: BackgrounderJob) {
+        var shouldBreak = false
+        while shouldBreak == false {
+            if let index = self.firstIndex(where: { $0.id == job.id }) {
+                self.remove(at: index)
+            }
+            else {
+                shouldBreak = true
+            }
+        }
+    }
 }
 
 extension BackgrounderJob: RedisObject {

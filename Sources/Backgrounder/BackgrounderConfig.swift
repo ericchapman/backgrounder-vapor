@@ -122,6 +122,9 @@ public struct BackgrounderConfig: ServiceType {
     /// The number of seconds to wait after stopping before killing the job
     public var killTimeout: Int
     
+    /// The number of seconds to wait before stopping a job
+    public var jobTimeout: Int
+    
     /// Specifies if this instance should perform maintenance tasks
     public var shouldPerformMaintenance: Bool
     
@@ -144,6 +147,7 @@ public struct BackgrounderConfig: ServiceType {
         maintenanceInterval: Int = 5,
         healthCheckInterval: Int = 5,
         killTimeout: Int = 10,
+        jobTimeout: Int = 60,
         shouldPerformMaintenance: Bool = true,
         logLevel: LogLevel = .info
         ) -> BackgrounderConfig {
@@ -162,6 +166,7 @@ public struct BackgrounderConfig: ServiceType {
             maintenanceInterval: maintenanceInterval,
             healthCheckInterval: healthCheckInterval,
             killTimeout: killTimeout,
+            jobTimeout: jobTimeout,
             shouldPerformMaintenance: shouldPerformMaintenance,
             logLevel: logLevel
         )
