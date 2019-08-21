@@ -49,9 +49,6 @@ final class WorkerTests: RedisTestCase {
     }
     
     func submitJobs(count: Int, failing: Bool=false, busy: Bool=false) throws {
-        // Create the submitter
-        let submitter = BackgrounderSubmitter(redis: self.connection)
-
         // Create the jobs
         var jobs = [BackgrounderJob]()
         for _ in (0..<count) {
@@ -65,7 +62,7 @@ final class WorkerTests: RedisTestCase {
                 jobs.append(BackgrounderJob(className: TestHandler.handlerClassName, args: [], retry: true))
             }
         }
-        _ = try submitter.submit(jobs: jobs).wait()
+        _ = try jobs.submit(on: self.app).wait()
     }
     
     func testWorkerJobDispatch() throws {
@@ -82,22 +79,19 @@ final class WorkerTests: RedisTestCase {
     }
     
     func testProcessErrorHandler() throws {
-        // Create the submitter
-        let submitter = BackgrounderSubmitter(redis: self.connection)
-        
         // Throw Immediate.  Should handle and value is nil
-        _ = try submitter.submit(job: BackgrounderJob(className: TestErrorHandler.handlerClassName, args: [true])).wait()
+        _ = try BackgrounderJob(className: TestErrorHandler.handlerClassName, args: [true]).submit(on: self.app).wait()
         sleep(1)
         XCTAssertNil(try self.redis.get(key: TestErrorHandler.key).wait())
         
         // Throw Later
-        _ = try submitter.submit(job: BackgrounderJob(className: TestErrorHandler.handlerClassName, args: [])).wait()
+        _ = try BackgrounderJob(className: TestErrorHandler.handlerClassName, args: []).submit(on: self.app).wait()
         sleep(1)
         XCTAssertEqual(try self.redis.get(key: TestErrorHandler.key).wait(), "1")
         
         // Check the error queue
         sleep(3)
-        XCTAssertEqual(try self.redis.zcount(key: BackgrounderQueue.deadQueue, min: .min, max: .max).wait(), 2)
+        XCTAssertEqual(try BackgrounderDeadQueue(redis: self.connection).size.wait(), 2)
     }
     
     func testProcessScheduleLogic() throws {
@@ -128,12 +122,12 @@ final class WorkerTests: RedisTestCase {
         while job1.shouldRetry(max: self.config.maxRetries) == true {}
         
         // Submit the jobs
-        XCTAssertEqual(try BackgrounderSubmitter(redis: self.connection).submit(jobs: [job1, job2]).wait(), 2)
+        XCTAssertEqual(try [job1, job2].submit(on: self.app).wait(), true)
         
         // Wait for the job to finish and check the queues
         sleep(3)
-        XCTAssertEqual(try self.redis.zcount(key: BackgrounderQueue.deadQueue, min: .min, max: .max).wait(), 1)
-        XCTAssertEqual(try self.redis.zcount(key: BackgrounderQueue.retryQueue, min: .min, max: .max).wait(), 1)
+        XCTAssertEqual(try BackgrounderDeadQueue(redis: self.connection).size.wait(), 1)
+        XCTAssertEqual(try BackgrounderRetryQueue(redis: self.connection).size.wait(), 1)
         
         // Flush Redis
         self.flush()
@@ -141,11 +135,10 @@ final class WorkerTests: RedisTestCase {
         // Cheat testing retry re-execute logic by placing a job in the retry queue and waiting for it to run
         let job3 = BackgrounderJob(className: "BackgrounderTests.TestHandler", args: [], runAt: Date().addingTimeInterval(2), retry: true)
         
-        // Create a scheduler and push to the retry queue
-        XCTAssertEqual(try BackgrounderScheduler(redis: self.connection).schedule(
-            job: job3,
-            queue: BackgrounderQueue.retryQueue).wait(), 1)
-        XCTAssertEqual(try self.redis.zcount(key: BackgrounderQueue.retryQueue, min: .min, max: .max).wait(), 1)
+        // Push to the retry queue
+        let retryQueue = BackgrounderRetryQueue(redis: self.connection)
+        XCTAssertEqual(try retryQueue.push(jobs: [job3]).wait(), 1)
+        XCTAssertEqual(try retryQueue.size.wait(), 1)
 
         sleep(6)
         XCTAssertEqual(try self.redis.get(key: TestHandler.key).wait(), "1")
@@ -220,25 +213,27 @@ final class WorkerTests: RedisTestCase {
     }
     
     func testKillTimeout() throws {
+        let queue = BackgrounderQueue(name: "default", redis: self.connection)
+
         // Ensure the job queue is empty
-        XCTAssertEqual(try self.redis.llen(key: "default").wait(), 0)
+        XCTAssertEqual(try queue.size.wait(), 0)
         
         // Create long running job
         let job = BackgrounderJob(className: TestBusyHandler.handlerClassName, args: [10], retry: true)
         
         // Submit the job
-        XCTAssertEqual(try BackgrounderSubmitter(redis: self.connection).submit(job: job).wait(), 1)
+        XCTAssertEqual(try job.submit(on: self.app).wait(), true)
         
         // Sleep 2 seconds and ensure the job is no longer in the queue (it is running
         sleep(1)
-        XCTAssertEqual(try self.redis.llen(key: "default").wait(), 0)
+        XCTAssertEqual(try queue.size.wait(), 0)
         
         // Explicitely stop the launcher
         try! self.process?.stop().wait()
         
         // Wait 3 seconds and make sure the job is pushed back to the queue
         sleep(UInt32(self.config.killTimeout)+1)
-        XCTAssertEqual(try self.redis.llen(key: "default").wait(), 1)
+        XCTAssertEqual(try queue.size.wait(), 1)
         
         // Nil out the proces sto make sure stop isn't called twice
         self.process = nil

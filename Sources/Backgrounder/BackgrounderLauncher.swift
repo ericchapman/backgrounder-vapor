@@ -276,9 +276,12 @@ public final class BackgrounderLauncher: Backgrounder, ServiceType {
                             for (_, runningJob) in workerJobs {
                                 if let queue = runningJob["queue"] as? String,
                                     let payload = runningJob["payload"] as? [String:Any] {
-                                    // Push the job back to Redis
-                                    BackgrounderSubmitter.submit(redis: conn, jobStrings: [payload.toJson()], queue: queue)
                                     
+                                    // Push the job back to Redis
+                                    let queue = BackgrounderQueue(name: queue, redis: connection)
+                                    queue.push(jobs: [payload.toJson()], redis: conn)
+    
+                                    // Print an info message
                                     if let jobId = payload["jid"] as? String {
                                         self.logger.info("requed unfinished job JID-\(jobId)")
                                     }

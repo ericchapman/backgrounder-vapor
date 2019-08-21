@@ -102,19 +102,34 @@ public class BackgrounderJob {
         self.enqueuedAt = Date()
     }
     
+    /// Function to submit a job
+    ///
+    /// - parameters:
+    ///   - worker: The worker to use to remove th job
+    ///
+    /// - returns: 'true' if the job was submitted
+    ///
+    @discardableResult
+    func submit(on worker: Container) -> Future<Bool> {
+        return RedisPooledConnection.openWithAutoClose(on: worker, as: .backgrounderRedis, closure: {
+            (connection: RedisConnection) -> Future<Bool> in
+            return BackgrounderQueue.push(redis: connection, jobs: [self]).map(to: Bool.self) { count in
+                return count > 0
+            }
+        })
+    }
+    
     /// Function to delete the job
     ///
     /// - parameters:
     ///   - worker: The worker to use to remove th job
     /// - returns: Future representing true if this was deleted
     ///
-    func delete(on worker: Container) -> Future<Bool> {
+    @discardableResult
+    public func delete(on worker: Container) -> Future<Bool> {
         return RedisPooledConnection.openWithAutoClose(on: worker, as: .backgrounderRedis, closure: {
             (connection: RedisConnection) -> Future<Bool> in
-            // Return true if the job was deleted
-            return BackgrounderSubmitter(redis: connection).delete(job: self).map(to: Bool.self, { (count: Int) -> Bool in
-                return count != 0
-            })
+            return BackgrounderQueue(name: self.queue, redis: connection).delete(job: self)
         })
     }
     
@@ -124,13 +139,31 @@ public class BackgrounderJob {
     ///   - worker: The worker to use to remove th job
     /// - returns: Future representing true if this was deleted
     ///
-    func deleteScheduled(on worker: Container) -> Future<Bool> {
+    @discardableResult
+    public func deleteScheduled(on worker: Container) -> Future<Bool> {
         return RedisPooledConnection.openWithAutoClose(on: worker, as: .backgrounderRedis, closure: {
             (connection: RedisConnection) -> Future<Bool> in
-            // Return true if the scheduled job was deleted
-            return BackgrounderScheduler(redis: connection).delete(job: self, queue: BackgrounderQueue.scheduleQueue).map(to: Bool.self, { (count: Int) -> Bool in
-                return count != 0
-            })
+            return BackgrounderScheduleQueue(redis: connection).delete(job: self)
+        })
+    }
+}
+
+extension Array where Element: BackgrounderJob {
+    
+    /// Function to submit multiple jobs
+    ///
+    /// - parameters:
+    ///   - worker: The worker to use to remove th job
+    ///
+    /// - returns: 'true' if the jobs were submitted
+    ///
+    @discardableResult
+    func submit(on worker: Container) -> Future<Bool> {
+        return RedisPooledConnection.openWithAutoClose(on: worker, as: .backgrounderRedis, closure: {
+            (connection: RedisConnection) -> Future<Bool> in
+            return BackgrounderQueue.push(redis: connection, jobs: self).map(to: Bool.self) { count in
+                return count == self.count
+            }
         })
     }
 }

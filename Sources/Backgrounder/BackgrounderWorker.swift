@@ -156,11 +156,9 @@ class BackgrounderWorker {
             // Make sure the Redis Connection exists
             guard let connection = self.connection else { return }
             
-            // Create a dispatcher
-            let dispatcher = BackgrounderDispatcher(redis: connection)
-            
             // Call the qeque method
-            dispatcher.dequeue(
+            BackgrounderQueue.popNext(
+                redis: connection,
                 queues: queues,
                 timeout: self.config.blockingTimeout).map { response in
                     self.isPollingRedis = false
@@ -169,7 +167,7 @@ class BackgrounderWorker {
                     
                     if let response = response {
                         // Perform the job
-                        self.performJob(response.1)
+                        self.performJob(response.0)
                     }
                     else {
                         // Else check again for a new job
@@ -442,21 +440,13 @@ extension BackgrounderWorker {
                 
                 // Add the errors to the pipeline
                 if totalErrors > 0 {
-                    var args = [(Double, String)]()
-                    for job in self.errors {
-                        args.append((Date().toEpoch, job.toRedis))
-                    }
-                    conn.zadd(key: BackgrounderQueue.deadQueue, scoreMemberPairs: args)
+                    BackgrounderDeadQueue(redis: connection).push(jobs: self.errors, runAt: Date(), redis: conn)
                 }
                 
                 // Add the retries to the pipeline
                 if totalRetries > 0 {
                     let retryTime = Date().addingTimeInterval(TimeInterval(self.config.retryInterval))
-                    var args = [(Double, String)]()
-                    for job in self.retries {
-                        args.append((retryTime.toEpoch, job.toRedis))
-                    }
-                    conn.zadd(key: BackgrounderQueue.retryQueue, scoreMemberPairs: args)
+                    BackgrounderRetryQueue(redis: connection).push(jobs: self.retries, runAt: retryTime, redis: conn)
                 }
                 
                 }.flatten(on: self.container).do { (responses: [RedisApiData]) in
@@ -488,13 +478,14 @@ extension BackgrounderWorker {
             self.logger.verbose("checking scheduled queue")
             
             // Enqueue the scheduled jobs
-            let enqueuer = BackgrounderEnqueuer(redis: connection)
-            enqueuer.enqueue(queue: BackgrounderQueue.scheduleQueue).map { count in
-                if count > 0 {
-                    self.logger.debug("enqueued \(count) scheduled jobs")
-                }
-                closure()
-                }.catch { (error: Error) in closure() }
+            BackgrounderScheduleQueue(redis: connection).popAll { job in
+                return BackgrounderQueue(name: job.queue, redis: connection).push(jobs: [job]).mapToVoid()
+                }.do { count in
+                    if count > 0 {
+                        self.logger.debug("enqueued \(count) scheduled jobs")
+                    }
+                    closure()
+                }.catch { error in closure() }
         }
         else { closure() }
     }
@@ -509,13 +500,14 @@ extension BackgrounderWorker {
             self.logger.verbose("checking retry queue")
             
             // Enqueue the retry jobs
-            let enqueuer = BackgrounderEnqueuer(redis: connection)
-            enqueuer.enqueue(queue: BackgrounderQueue.retryQueue).map { count in
-                if count > 0 {
-                    self.logger.debug("enqueued \(count) retry jobs")
-                }
-                closure()
-                }.catch { (error: Error) in closure() }
+            BackgrounderRetryQueue(redis: connection).popAll { job in
+                return BackgrounderQueue(name: job.queue, redis: connection).push(jobs: [job]).mapToVoid()
+                }.do { count in
+                    if count > 0 {
+                        self.logger.debug("enqueued \(count) retry jobs")
+                    }
+                    closure()
+                }.catch { error in closure() }
         }
         else { closure() }
     }

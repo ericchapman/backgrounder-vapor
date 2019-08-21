@@ -23,23 +23,23 @@ final class HandlerTests: RedisTestCase {
     }
     
     func testPerformIn() throws {
-        let queue = BackgrounderQueue.scheduleQueue
+        let queue = BackgrounderScheduleQueue(redis: self.connection)
         
-        XCTAssertEqual(try self.redis.zcount(key: queue, min: .min, max: .max).wait(), 0)
+        XCTAssertEqual(try queue.size.wait(), 0)
         
         // Dispatch test handler
         _ = try TestHandler.performIn(200, args: [10], on: self.app).wait()
-        XCTAssertEqual(try self.redis.zcount(key: queue, min: .min, max: .max).wait(), 1)
+        XCTAssertEqual(try queue.size.wait(), 1)
     }
     
     func testPerformAt() throws {
-        let queue = BackgrounderQueue.scheduleQueue
+        let queue = BackgrounderScheduleQueue(redis: self.connection)
         
-        XCTAssertEqual(try self.redis.zcount(key: queue, min: .min, max: .max).wait(), 0)
+        XCTAssertEqual(try queue.size.wait(), 0)
         
         // Dispatch test handler
         _ = try TestHandler.performAt(Date().addingTimeInterval(200), args: [10], on: self.app).wait()
-        XCTAssertEqual(try self.redis.zcount(key: queue, min: .min, max: .max).wait(), 1)
+        XCTAssertEqual(try queue.size.wait(), 1)
     }
     
     func testSetPerformAsync() throws {
@@ -59,23 +59,23 @@ final class HandlerTests: RedisTestCase {
     }
     
     func testSetPerformIn() throws {
-        let queue = BackgrounderQueue.scheduleQueue
+        let queue = BackgrounderScheduleQueue(redis: self.connection)
         
-        XCTAssertEqual(try self.redis.zcount(key: queue, min: .min, max: .max).wait(), 0)
+        XCTAssertEqual(try queue.size.wait(), 0)
         
         // Dispatch test handler
         _ = try TestHandler.set(queue: "high").performIn(200, args: [10], on: self.app).wait()
-        XCTAssertEqual(try self.redis.zcount(key: queue, min: .min, max: .max).wait(), 1)
+        XCTAssertEqual(try queue.size.wait(), 1)
     }
     
     func testSetPerformAt() throws {
-        let queue = BackgrounderQueue.scheduleQueue
+        let queue = BackgrounderScheduleQueue(redis: self.connection)
         
-        XCTAssertEqual(try self.redis.zcount(key: queue, min: .min, max: .max).wait(), 0)
+        XCTAssertEqual(try queue.size.wait(), 0)
         
         // Dispatch test handler
         _ = try TestHandler.set(queue: "high").performAt(Date().addingTimeInterval(200), args: [10], on: self.app).wait()
-        XCTAssertEqual(try self.redis.zcount(key: queue, min: .min, max: .max).wait(), 1)
+        XCTAssertEqual(try queue.size.wait(), 1)
     }
     
     func testDefault() throws {

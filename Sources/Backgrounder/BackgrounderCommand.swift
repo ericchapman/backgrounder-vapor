@@ -72,8 +72,8 @@ public struct BackgrounderCommand: Command, ServiceType {
                     // Open a Redis connection
                     let connection = try RedisConnection.open(on: context.container, as: .backgrounderRedis).wait()
                     
-                    let submitter = BackgrounderSubmitter(redis: connection)
-                    _ = try submitter.submit(jobs: jobs).wait()
+                    // Submit the jobs to Redis
+                    _ = try BackgrounderQueue.push(redis: connection, jobs: jobs).wait()
                     
                     context.console.print("Jobs submitted")
                     

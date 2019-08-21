@@ -10,7 +10,7 @@ final class QueueTests: RedisTestCase {
         _ = try TestHandler.set(queue: "queue1").performAsync(args: [true], on: self.app).wait()
         _ = try TestHandler.set(queue: "queue2").performAsync(args: [true], on: self.app).wait()
         _ = try TestHandler.set(queue: "queue2").performAsync(args: [true], on: self.app).wait()
-        
+
         // Check the sizes of the queues
         let queues = try BackgrounderQueue.all(redis: self.connection).wait()
         XCTAssertEqual(queues.count, 2)

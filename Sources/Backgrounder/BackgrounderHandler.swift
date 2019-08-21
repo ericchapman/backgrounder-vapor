@@ -111,7 +111,9 @@ extension BackgrounderHandler {
             retry: self.retry)
         
         // Push the job to Redis
-        return BackgrounderHandlerProxy.submit(job: job, on: worker)
+        return job.submit(on: worker).map(to: BackgrounderJob.self) { wasSubmitted in
+            return job
+        }
     }
     
     public static func set(queue: String?=nil, id: String?=nil, retry: Bool?=nil) -> BackgrounderHandlerProxy {
@@ -176,16 +178,8 @@ public class BackgrounderHandlerProxy {
             retry: self.retry)
         
         // Push the job to Redis
-        return BackgrounderHandlerProxy.submit(job: job, on: worker)
-    }
-    
-    public static func submit(job: BackgrounderJob, on worker: Container) -> Future<BackgrounderJob> {
-        return RedisPooledConnection.openWithAutoClose(on: worker, as: .backgrounderRedis, closure: {
-            (connection: RedisConnection) -> Future<BackgrounderJob> in
-            return try BackgrounderSubmitter(redis: connection).submit(job: job).map(to: BackgrounderJob.self, {
-                (count: Int) -> BackgrounderJob in
-                return job
-            })
-        })
+        return job.submit(on: worker).map(to: BackgrounderJob.self) { wasSubmitted in
+            return job
+        }
     }
 }
