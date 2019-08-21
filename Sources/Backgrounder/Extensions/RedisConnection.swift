@@ -9,6 +9,9 @@ public class RedisConnection {
     /// The identifier for the Redis DB
     let identifier: RedisIdentifier
     
+    /// Flag signalling if the connection was closed
+    var isClosed = false
+    
     /// The worker for this client
     public var worker: Container {
         return self.api.worker
@@ -41,10 +44,26 @@ public class RedisConnection {
         as identifier: RedisIdentifier,
         closure: @escaping (RedisConnection) throws -> Future<T>) -> Future<T> {
         return self.open(on: worker, as: identifier).flatMap(to: T.self) { connection in
-            return try closure(connection).map(to: T.self, { (result: T) -> T in
+            
+            let promise = worker.eventLoop.newPromise(of: T.self)
+            
+            func success(_ result: T) {
+                promise.succeed(result: result)
                 connection.close()
-                return result
-            })
+            }
+            
+            func failure(_ error: Error) {
+                promise.fail(error: error)
+                connection.close()
+            }
+            
+            worker.eventLoop.submit {
+                return try closure(connection).do { result in
+                    success(result)
+                    }.catch { error in failure(error) }
+            }.catch { error in failure(error) }
+            
+            return promise.futureResult
         }
     }
     
@@ -61,6 +80,7 @@ public class RedisConnection {
     /// Closes the connection
     ///
     public func close() {
+        self.isClosed = true
         self.client.close()
     }
 }
@@ -80,6 +100,7 @@ public class RedisPooledConnection: RedisConnection {
     /// Releases the pooled connection
     ///
     override public func close() {
+        self.isClosed = true
         do {
             try self.worker.releasePooledConnection(self.client, to: self.identifier)
         } catch {
