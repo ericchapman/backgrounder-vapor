@@ -228,7 +228,7 @@ class BackgrounderWorker {
                 let elapsedTime = Date().timeIntervalSince(startTime)
                 
                 // Log the job completion
-                logger.info("done: \(Int(round(1000*elapsedTime))) ms")
+                logger.info("done: \(String(format: "%.3f", elapsedTime)) sec")
                 
                 }.catch { error in self.jobError(job, error) }
         } catch { self.jobError(job, error) }
