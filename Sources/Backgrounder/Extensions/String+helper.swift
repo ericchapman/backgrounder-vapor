@@ -10,19 +10,7 @@ extension String {
     var toClass: AnyClass? {
         return NSClassFromString(self)
     }
-    
-    /// Converts a queue name to Redis name
-    ///
-    var toRedisQueueName: String {
-        return "queue:\(self)"
-    }
-    
-    /// Converts a Redis name back to queue name
-    ///
-    var fromRedisQueueName: String {
-        return self.replacingOccurrences(of: "queue:", with: "")
-    }
-    
+
     /// Converts a Ruby class name to Swift
     ///
     /// - note: Automatically add the prefix "App" if no prefix was included.

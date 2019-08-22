@@ -10,14 +10,15 @@ final class HandlerTests: RedisTestCase {
         let job = try TestHandler.performAsync(args: [true], on: self.app).wait()
         
         // Check Redis
-        let pushedJobData = try self.redis.lpop(key: "default".toRedisQueueName).wait()!
-        let pushedJob = try BackgrounderJob.fromRedis(pushedJobData)
+        let pushedJobInfo = try BackgrounderQueue.popNext(redis: self.connection, queues: ["default"], timeout: 2).wait()
+        let pushedJob = pushedJobInfo?.0
         
-        XCTAssertEqual(pushedJob.id, job.id)
-        XCTAssertEqual(pushedJob.className, "BackgrounderTests.TestHandler")
-        XCTAssertEqual(pushedJob.queue, "default")
-        XCTAssertEqual(pushedJob.args.first as? Bool, true)
-        XCTAssertNil(pushedJob.runAt)
+        XCTAssertNotNil(pushedJob)
+        XCTAssertEqual(pushedJob?.id, job.id)
+        XCTAssertEqual(pushedJob?.className, "BackgrounderTests.TestHandler")
+        XCTAssertEqual(pushedJob?.queue, "default")
+        XCTAssertEqual(pushedJob?.args.first as? Bool, true)
+        XCTAssertNil(pushedJob?.runAt)
         
         XCTAssertEqual(try self.redis.smembers(key: "queues").wait().count, 1)
     }
@@ -48,14 +49,15 @@ final class HandlerTests: RedisTestCase {
         XCTAssertEqual(job.id, "1234")
         
         // Check Redis
-        let pushedJobData = try self.redis.lpop(key: "high".toRedisQueueName).wait()!
-        let pushedJob = try BackgrounderJob.fromRedis(pushedJobData)
+        let pushedJobInfo = try BackgrounderQueue.popNext(redis: self.connection, queues: ["high"], timeout: 2).wait()
+        let pushedJob = pushedJobInfo?.0
         
-        XCTAssertEqual(pushedJob.id, job.id)
-        XCTAssertEqual(pushedJob.className, "BackgrounderTests.TestHandler")
-        XCTAssertEqual(pushedJob.queue, "high")
-        XCTAssertEqual(pushedJob.args.first as? Int, 10)
-        XCTAssertNil(pushedJob.runAt)
+        XCTAssertNotNil(pushedJob)
+        XCTAssertEqual(pushedJob?.id, job.id)
+        XCTAssertEqual(pushedJob?.className, "BackgrounderTests.TestHandler")
+        XCTAssertEqual(pushedJob?.queue, "high")
+        XCTAssertEqual(pushedJob?.args.first as? Int, 10)
+        XCTAssertNil(pushedJob?.runAt)
     }
     
     func testSetPerformIn() throws {

@@ -6,18 +6,27 @@ public class BackgrounderLogger: Logger {
     let level: LogLevel
     
     /// The prefix for the log
-    let prefix: String?
+    let prefix: String
+    
+    /// If the logging is detailed or not
+    let detailed: Bool
 
     /// Constructor
-    public init(level: LogLevel, prefix: String?=nil) {
+    public init(level: LogLevel, prefix: String?=nil, detailed: Bool=true) {
         self.level = level
-        self.prefix = prefix
+        self.prefix = prefix != nil ? "\(prefix!) " : ""
+        self.detailed = detailed
     }
     
     /// Implement the logger
     public func log(_ string: String, at level: LogLevel, file: String, function: String, line: UInt, column: UInt) {
         if level.intValue >= self.level.intValue {
-            print("\(Date().iso8601) [\(level.description)]: Backgrounder\(self.prefix != nil ? " \(self.prefix!)" : "") - \(string)")
+            if detailed {
+                print("\(Date().iso8601) \(self.prefix)\(level.description): \(string)")
+            }
+            else {
+                print("\(self.prefix)\(level.description): \(string)")
+            }
         }
     }
 }

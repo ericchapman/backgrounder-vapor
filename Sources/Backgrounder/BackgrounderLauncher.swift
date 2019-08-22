@@ -70,22 +70,22 @@ public final class BackgrounderLauncher: Backgrounder, ServiceType {
     
     /// The time the process started
     let startedAt: Date
-    
-    /// The uuid id of the process
-    let id: String
-    
+
     /// The hostname
     let hostname: String
     
     /// The OS pid the process is executing in
     let pid: Int32
     
+    /// Process "nonce" used in Sidekiq for logging
+    let processNonce: String
+    
     /// Serialed version of the process
     public var redisData: String?
 
     /// The Sidekiq identity of the process
     var identity: String {
-        return "\(self.hostname):\(self.pid):\(self.id)"
+        return "\(self.hostname):\(self.pid):\(self.processNonce)"
     }
     
     /// The event loop of the container
@@ -115,13 +115,17 @@ public final class BackgrounderLauncher: Backgrounder, ServiceType {
     ///     - container: Root service-container to use for all event loops the server will create.
     ///
     public init(config: BackgrounderConfig, on container: Container) {
-        self.id = UUID().TID
         self.startedAt = Date()
         self.hostname = ProcessInfo.processInfo.hostName
         self.pid = ProcessInfo.processInfo.processIdentifier
+        self.processNonce = UUID().TID
         self.config = config
         self.container = container
-        self.logger = BackgrounderLogger(level: self.config.logLevel, prefix: "PID-\(self.id)")
+        
+        self.logger = BackgrounderLogger(
+            level: self.config.logLevel,
+            prefix: "\(self.pid)",
+            detailed: self.config.detailedLogging)
     }
 
     /// Starts the backgrounder launcher
@@ -139,7 +143,7 @@ public final class BackgrounderLauncher: Backgrounder, ServiceType {
         
         // Print startup message
         let console = try container.make(Console.self)
-        console.print("Backgrounder Process Started With Configuration")
+        console.print("Backgrounder Process \(self.pid) Started With Configuration")
         console.print("   - tag: \(self.config.tag)")
         console.print("   - stat TTL: \(self.config.statTTL) s")
         console.print("   - concurrency: \(self.config.concurrency)")
@@ -154,6 +158,7 @@ public final class BackgrounderLauncher: Backgrounder, ServiceType {
         console.print("   - health check interval: \(self.config.healthCheckInterval) s")
         console.print("   - maintenance interval: \(self.config.maintenanceInterval) s")
         console.print("   - should perform maintenance: \(self.config.shouldPerformMaintenance)")
+        console.print("   - detailed logging: \(self.config.detailedLogging)")
         console.print("   - log level: \(self.config.logLevel)")
         
         self.logger.info("started")

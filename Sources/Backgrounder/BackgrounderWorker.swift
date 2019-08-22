@@ -92,9 +92,13 @@ class BackgrounderWorker {
         self.container = container
         self.id = UUID().TID
         self.config = config
-        self.logger = BackgrounderLogger(level: self.config.logLevel, prefix: "TID-\(self.id)")
         self.promise = container.eventLoop.newPromise(String.self)
         self.maintenanceAt = Date.random(in: self.config.maintenanceInterval)
+        
+        self.logger = BackgrounderLogger(
+            level: self.config.logLevel,
+            prefix: "\(ProcessInfo.processInfo.processIdentifier) TID-\(self.id)",
+            detailed: self.config.detailedLogging)
     }
     
     /// Stops the process
@@ -200,7 +204,10 @@ class BackgrounderWorker {
         self.jobStarted(job, startTime: startTime)
         
         // Create a job logger
-        let logger = BackgrounderLogger(level: self.config.logLevel, prefix: "TID-\(self.id) \(job.className) JID-\(job.id)")
+        let logger = BackgrounderLogger(
+            level: self.config.logLevel,
+            prefix: "\(ProcessInfo.processInfo.processIdentifier) TID-\(self.id) \(job.className.toRuby) JID-\(job.id)",
+            detailed: self.config.detailedLogging)
         
         // Log the job start
         logger.info("start")
@@ -297,7 +304,8 @@ class BackgrounderWorker {
     private func jobError(_ job: BackgrounderJob, _ error: Error) {
         
         // Log the error
-        self.logger.error("job '\(job.toRedis)' ended with error '\(error)'")
+        self.logger.warning("job raised exception: '\(job.toRedis)'")
+        self.logger.warning("\(error)")
         
         // Increment the number of failed jobs
         self.failedCount.increment()

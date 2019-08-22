@@ -128,6 +128,9 @@ public struct BackgrounderConfig: ServiceType {
     /// Specifies if this instance should perform maintenance tasks
     public var shouldPerformMaintenance: Bool
     
+    /// Specifies if logging should use detailed method
+    public var detailedLogging: Bool
+    
     /// The logging level
     public var logLevel: LogLevel
     
@@ -149,6 +152,7 @@ public struct BackgrounderConfig: ServiceType {
         killTimeout: Int = 10,
         jobTimeout: Int = 60,
         shouldPerformMaintenance: Bool = true,
+        detailedLogging: Bool = true,
         logLevel: LogLevel = .info
         ) -> BackgrounderConfig {
         return BackgrounderConfig(
@@ -168,6 +172,7 @@ public struct BackgrounderConfig: ServiceType {
             killTimeout: killTimeout,
             jobTimeout: jobTimeout,
             shouldPerformMaintenance: shouldPerformMaintenance,
+            detailedLogging: detailedLogging,
             logLevel: logLevel
         )
     }
