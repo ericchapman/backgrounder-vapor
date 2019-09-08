@@ -423,12 +423,6 @@ extension BackgrounderLauncher {
         self.hearbeatTask = self.eventLoop.scheduleRepeatedTask(
             initialDelay: TimeAmount.seconds(1),
             delay: TimeAmount.seconds(self.config.healthCheckInterval)) { (task: RepeatedTask) -> () in
-                
-                // If we are in debug mode or less, print the memory usage
-                if self.config.logLevel.intValue <= LogLevel.debug.intValue {
-                    do { self.logger.debug("Memory Usage: \(try Memory.usage()) MB") }
-                    catch { self.logger.error("Memory Usage Error: \(error)") }   
-                }
 
                 // Get the counter values
                 let processed = self.processedCount.reset()
