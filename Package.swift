@@ -14,7 +14,9 @@ let package = Package(
         .package(url: "https://github.com/vapor/vapor.git", from: "3.0.0"),
         
         // ⚡️ Non-blocking, event-driven Redis client.
-        .package(url: "https://github.com/vapor/redis.git", from: "3.4.0"),
+        //.package(url: "https://github.com/vapor/redis.git", from: "3.4.0"),
+        // TODO: Update once issue 150 has been fixed
+        .package(url: "https://github.com/ericchapman/redis.git", .branch("issue-150-dropped-connection-handling")),
         
         // Redis Api
         .package(url: "https://github.com/ericchapman/vapor-redis-api.git", from: "0.3.0")

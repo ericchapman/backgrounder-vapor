@@ -305,6 +305,27 @@ final class WorkerTests: RedisTestCase {
         XCTAssertEqual(self.process?.state, .idle)
     }
     
+    func testDroppedConnection() throws {
+        // Submit a job and make sure it completes
+        _ = try TestHandler.performAsync(args: [], on: self.app).wait()
+        sleep(1)
+        XCTAssertEqual(try self.redis.get(key: TestHandler.key).wait(), "1")
+        
+        // Force close the Redis connections
+        self.process?.forEachWorker { worker in
+            worker.connection?.close()
+        }
+        sleep(1)
+        
+        // Submit anotehr job and make sure it completes
+        _ = try TestHandler.performAsync(args: [], on: self.app).wait()
+        sleep(1)
+        XCTAssertEqual(try self.redis.get(key: TestHandler.key).wait(), "2")
+        
+        self.process?.stop()
+        self.process = nil
+    }
+    
     static var allTests = [
         ("testWorkerJobDispatch", testWorkerJobDispatch),
         ("testProcessErrorHandler", testProcessErrorHandler),
@@ -313,5 +334,6 @@ final class WorkerTests: RedisTestCase {
         ("testProcessHeartbeat", testProcessHeartbeat),
         ("testKillTimeout", testKillTimeout),
         ("testStopCommands", testStopCommands),
+        ("testDroppedConnection", testDroppedConnection),
         ]
 }

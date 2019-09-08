@@ -57,11 +57,11 @@
       },
       {
         "package": "Redis",
-        "repositoryURL": "https://github.com/vapor/redis.git",
+        "repositoryURL": "https://github.com/ericchapman/redis.git",
         "state": {
-          "branch": null,
-          "revision": "b6c0c98d2219f550ccf23c4bb8f8b14d75356bc6",
-          "version": "3.4.0"
+          "branch": "issue-150-dropped-connection-handling",
+          "revision": "2abb592e4854239dd3eddf07a933396aa45f4579",
+          "version": null
         }
       },
       {
