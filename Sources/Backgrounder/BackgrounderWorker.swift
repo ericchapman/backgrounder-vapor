@@ -304,8 +304,7 @@ class BackgrounderWorker {
     private func jobError(_ job: BackgrounderJob, _ error: Error) {
         
         // Log the error
-        self.logger.warning("job raised exception: '\(job.toRedis)'")
-        self.logger.warning("\(error)")
+        self.logger.warning("job raised error '\(error)' details: \(job.toRedis)")
         
         // Increment the number of failed jobs
         self.failedCount.increment()
