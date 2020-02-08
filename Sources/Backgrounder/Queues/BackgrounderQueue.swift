@@ -67,7 +67,7 @@ public class BackgrounderQueue: BackgrounderBaseQueue {
     public func clear() -> Future<Void> {
         return self.redis.multi { conn in
             conn.del(keys: [self.nameKey])
-            conn.srem(key: "queues", members: [self.nameKey])
+            conn.srem(key: "queues", members: [self.name])
             }.flatten(on: self.worker).mapToVoid()
     }
 
@@ -111,7 +111,7 @@ public class BackgrounderQueue: BackgrounderBaseQueue {
         
         // Use a multi block to add the queue to the list while submitting the job
         redis.multi { multi in
-            multi.sadd(key: "queues", members: [self.nameKey])
+            multi.sadd(key: "queues", members: [self.name])
             multi.lpush(key: self.nameKey, values: jobs).do { count in
                 promise.succeed(result: count)
                 }.catch { error in promise.fail(error: error) }
