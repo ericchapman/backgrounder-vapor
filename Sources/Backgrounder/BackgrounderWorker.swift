@@ -427,11 +427,13 @@ class BackgrounderWorker {
     ///
     func runHealthCheck(closure: @escaping (BackgrounderWorker, Int, Int, [String:[String:Any]])->()) {
         
-        // Check for jobs that have reached the job timeout
-        let expireStartTime = self.config.jobTimeout.seconds.ago
-        for (_, value) in self.runningJobs {
-            if value.1 < expireStartTime {
-                self.jobError(value.0, WorkerError.jobTimeoutReached(seconds: self.config.jobTimeout))
+        // If the job timeout was specified, check for jobs that have reached the job timeout
+        if let jobTimeout = self.config.jobTimeout {
+            let expireStartTime = jobTimeout.seconds.ago
+            for (_, value) in self.runningJobs {
+                if value.1 < expireStartTime {
+                    self.jobError(value.0, WorkerError.jobTimeoutReached(seconds: jobTimeout))
+                }
             }
         }
         

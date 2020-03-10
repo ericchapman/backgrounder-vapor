@@ -123,7 +123,7 @@ public struct BackgrounderConfig: ServiceType {
     public var killTimeout: Int
     
     /// The number of seconds to wait before stopping a job
-    public var jobTimeout: Int
+    public var jobTimeout: Int?
     
     /// Specifies if this instance should perform maintenance tasks
     public var shouldPerformMaintenance: Bool
@@ -150,7 +150,7 @@ public struct BackgrounderConfig: ServiceType {
         maintenanceInterval: Int = 5,
         healthCheckInterval: Int = 5,
         killTimeout: Int = 10,
-        jobTimeout: Int = 60,
+        jobTimeout: Int? = nil,
         shouldPerformMaintenance: Bool = true,
         detailedLogging: Bool = true,
         logLevel: LogLevel = .info
